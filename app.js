@@ -1,258 +1,300 @@
-const OWNER = 'dmgriff';
-const REPO = 'rie-icu-rota-calendar';
-const BRANCH = 'main';
-const ROTA_FOLDER = 'rotas';
+const REPO_OWNER_FALLBACK = "dmgriff";
+const REPO_NAME_FALLBACK = "rie-icu-rota-calendar";
+const BRANCH = "main";
 
-const MONTHS={january:0,february:1,march:2,april:3,may:4,june:5,july:6,august:7,september:8,october:9,november:10,december:11};
-const MONTH_NAMES=['January','February','March','April','May','June','July','August','September','October','November','December'];
-let data = { periods: [], rows: [], shifts: [], names: [], files: [] };
+const MONTHS = {
+  january: 0, february: 1, march: 2, april: 3, may: 4, june: 5,
+  july: 6, august: 7, september: 8, october: 9, november: 10, december: 11
+};
+const MONTH_NAMES = Object.keys(MONTHS).map(m => m[0].toUpperCase() + m.slice(1));
 
-const loadingPanel=document.getElementById('loadingPanel');
-const mainPanel=document.getElementById('mainPanel');
-const errorPanel=document.getElementById('errorPanel');
-const loadStatus=document.getElementById('loadStatus');
-const errorText=document.getElementById('errorText');
-const periodSelect=document.getElementById('periodSelect');
-const nameSelect=document.getElementById('nameSelect');
-const shiftCount=document.getElementById('shiftCount');
-const shiftPreview=document.getElementById('shiftPreview');
-const rotaTable=document.getElementById('rotaTable');
-const confirmCheck=document.getElementById('confirmCheck');
-const downloadBtn=document.getElementById('downloadBtn');
+const COLUMNS = [
+  "118 base A",
+  "118 Base B",
+  "116 base C",
+  "116 base D",
+  "1st on call night",
+  "2nd on call night"
+];
 
-document.addEventListener('DOMContentLoaded', init);
+const els = {
+  periodSelect: document.getElementById("periodSelect"),
+  nameSelect: document.getElementById("nameSelect"),
+  summaryCard: document.getElementById("summaryCard"),
+  summaryText: document.getElementById("summaryText"),
+  shiftList: document.getElementById("shiftList"),
+  rotaCard: document.getElementById("rotaCard"),
+  rotaTableWrap: document.getElementById("rotaTableWrap"),
+  downloadBtn: document.getElementById("downloadBtn"),
+  confirmCheck: document.getElementById("confirmCheck")
+};
 
-async function init(){
-  try{
-    if(!window.JSZip) throw new Error('The document parser did not load. Check internet access and refresh.');
-    data = await loadAllRotaFiles();
-    if(!data.shifts.length) throw new Error('No duties were found in the Word rota files.');
-    setupControls();
-    loadingPanel.classList.add('hidden');
-    mainPanel.classList.remove('hidden');
-    render();
-  }catch(err){
-    console.error(err);
-    loadingPanel.classList.add('hidden');
-    errorPanel.classList.remove('hidden');
-    errorText.textContent = err.message || String(err);
+let rotaPeriods = [];
+let selectedPeriod = null;
+let selectedName = "";
+
+function repoInfo() {
+  const host = window.location.hostname;
+  const parts = window.location.pathname.split("/").filter(Boolean);
+  if (host.endsWith("github.io") && parts.length > 0) {
+    return { owner: host.replace(".github.io", ""), repo: parts[0] };
   }
+  return { owner: REPO_OWNER_FALLBACK, repo: REPO_NAME_FALLBACK };
 }
 
-async function loadAllRotaFiles(){
-  loadStatus.textContent = 'Finding Word rota files in GitHub...';
-  const apiUrl = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${ROTA_FOLDER}?ref=${BRANCH}`;
-  const res = await fetch(apiUrl, { cache: 'no-store' });
-  if(!res.ok) throw new Error(`Could not read GitHub rotas folder. Expected ${OWNER}/${REPO}/${ROTA_FOLDER}.`);
+async function listDocxFiles() {
+  const { owner, repo } = repoInfo();
+  const api = `https://api.github.com/repos/${owner}/${repo}/contents/rotas?ref=${BRANCH}`;
+  const res = await fetch(api, { headers: { "Accept": "application/vnd.github+json" } });
+  if (!res.ok) throw new Error("Could not read the rotas folder. Check that rotas/ exists and contains .docx files.");
   const items = await res.json();
-  const files = items
-    .filter(item => item.type === 'file' && /\.docx$/i.test(item.name))
-    .sort((a,b)=> new Date(a.git_url ? 0 : 0) - new Date(b.git_url ? 0 : 0) || a.name.localeCompare(b.name));
-  if(!files.length) throw new Error('No .docx files found in the rotas folder.');
+  return items
+    .filter(item => item.type === "file" && item.name.toLowerCase().endsWith(".docx"))
+    .map(item => ({ name: item.name, url: item.download_url }));
+}
 
-  const parsed=[];
-  for(let i=0;i<files.length;i++){
-    const file=files[i];
-    loadStatus.textContent = `Reading rota ${i+1} of ${files.length}: ${file.name}`;
-    const fileRes = await fetch(file.download_url + `?v=${Date.now()}`, { cache: 'no-store' });
-    if(!fileRes.ok) throw new Error('Could not download '+file.name);
-    const buffer = await fileRes.arrayBuffer();
-    const d = await parseDocxArrayBuffer(buffer, file.name, i);
-    parsed.push(d);
+async function extractDocxText(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Could not download ${url}`);
+  const buffer = await res.arrayBuffer();
+  const result = await mammoth.extractRawText({ arrayBuffer: buffer });
+  return result.value || "";
+}
+
+function cleanLines(text) {
+  return text.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+}
+
+function compactName(x) {
+  return String(x || "").trim().replace(/\s+/g, " ");
+}
+
+function isNameCell(x) {
+  const s = compactName(x);
+  if (!s) return false;
+  if (/^(118|116|1st|2nd|base|on call|night|monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i.test(s)) return false;
+  if (/^\d+$/.test(s)) return false;
+  return /^[A-Z][A-Z '\-]+$/.test(s) || /^[A-Z]\s+[A-Z][A-Z '\-]+$/.test(s);
+}
+
+function dateIso(year, monthIndex, day) {
+  return `${year}-${String(monthIndex + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function parseRotaText(text, fileName) {
+  const lines = cleanLines(text);
+  const months = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const heading = lines[i].match(/Critical Care Consultant rota\s+([A-Za-z]+)\s+(\d{4})/i);
+    if (!heading) { i++; continue; }
+
+    const monthName = heading[1].toLowerCase();
+    const year = Number(heading[2]);
+    const monthIndex = MONTHS[monthName];
+    const monthTitle = `${MONTH_NAMES[monthIndex]} ${year}`;
+    const rows = [];
+    i++;
+
+    while (i < lines.length && !/Critical Care Consultant rota\s+[A-Za-z]+\s+\d{4}/i.test(lines[i])) {
+      const weekday = lines[i];
+      if (/^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)$/i.test(weekday) && /^\d{1,2}$/.test(lines[i + 1] || "")) {
+        const day = Number(lines[i + 1]);
+        const values = [];
+        let j = i + 2;
+        while (j < lines.length && values.length < COLUMNS.length && !/^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)$/i.test(lines[j]) && !/Critical Care Consultant rota\s+[A-Za-z]+\s+\d{4}/i.test(lines[j])) {
+          const value = compactName(lines[j]);
+          if (isNameCell(value)) values.push(value);
+          j++;
+        }
+        if (values.length >= COLUMNS.length) {
+          rows.push({
+            date: dateIso(year, monthIndex, day),
+            weekday,
+            day,
+            duties: COLUMNS.map((column, idx) => ({ column, name: values[idx] || "" }))
+          });
+          i = j;
+          continue;
+        }
+      }
+      i++;
+    }
+    if (rows.length) months.push({ title: monthTitle, year, monthIndex, rows });
   }
-  return combineRotaData(parsed);
+
+  const allRows = months.flatMap(m => m.rows.map(r => ({ ...r, monthTitle: m.title })));
+  const names = Array.from(new Set(allRows.flatMap(r => r.duties.map(d => d.name)).filter(Boolean))).sort((a,b) => a.localeCompare(b));
+  const label = makePeriodLabel(months, fileName);
+  return { fileName, label, months, names };
 }
 
-function setupControls(){
-  periodSelect.innerHTML = data.periods.map(p => `<option value="${esc(p.key)}">${esc(p.label)}</option>`).join('');
-  populateNames();
-  periodSelect.addEventListener('change', () => { populateNames(); render(); });
-  nameSelect.addEventListener('change', render);
-  confirmCheck.addEventListener('change', updateDownloadState);
-  downloadBtn.addEventListener('click', downloadIcs);
+function makePeriodLabel(months, fileName) {
+  if (!months.length) return fileName.replace(/\.docx$/i, "");
+  const first = months[0];
+  const last = months[months.length - 1];
+  const start = first.title.split(" ")[0];
+  const end = last.title.split(" ")[0];
+  const yearText = first.year === last.year ? String(first.year) : `${first.year}-${last.year}`;
+  return `${start} - ${end} ${yearText}`;
 }
 
-function populateNames(){
-  const period = periodSelect.value || 'all';
-  const names = [...new Set(data.shifts.filter(s => period === 'all' || s.periodKey === period).map(s => s.name))].sort((a,b)=>a.localeCompare(b));
-  nameSelect.innerHTML = '<option value="">Select name...</option>' + names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
-  confirmCheck.checked = false;
+function eventsForName(period, name) {
+  const events = [];
+  for (const month of period.months) {
+    for (const row of month.rows) {
+      for (const duty of row.duties) {
+        if (duty.name === name) {
+          events.push({ date: row.date, weekday: row.weekday, duty: duty.column, name, month: month.title });
+        }
+      }
+    }
+  }
+  return events;
 }
 
-function selectedShifts(){
-  const period = periodSelect.value || 'all';
-  const name = nameSelect.value;
-  if(!name) return [];
-  return data.shifts
-    .filter(s => (period === 'all' || s.periodKey === period) && s.name === name)
-    .sort((a,b)=> a.date.localeCompare(b.date) || a.column.localeCompare(b.column));
+function nextDate(iso) {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0,10).replace(/-/g, "");
+}
+function yyyymmdd(iso) { return iso.replace(/-/g, ""); }
+function stamp() { return new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z"); }
+function esc(s) { return String(s).replace(/\\/g,"\\\\").replace(/,/g,"\\,").replace(/;/g,"\\;").replace(/\n/g,"\\n"); }
+
+function generateICS(events, periodLabel) {
+  const dtstamp = stamp();
+  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "CALSCALE:GREGORIAN"];
+  events.forEach((e, idx) => {
+    lines.push(
+      "BEGIN:VEVENT",
+      `UID:${e.date}-${idx}-${e.name.replace(/\s+/g,"-")}@rie-icu-rota`,
+      `DTSTAMP:${dtstamp}`,
+      `DTSTART;VALUE=DATE:${yyyymmdd(e.date)}`,
+      `DTEND;VALUE=DATE:${nextDate(e.date)}`,
+      `SUMMARY:${esc(e.duty)}`,
+      `DESCRIPTION:${esc(`${e.duty} — ${e.name}. Source rota: ${periodLabel}`)}`,
+      "END:VEVENT"
+    );
+  });
+  lines.push("END:VCALENDAR");
+  return lines.join("\r\n");
 }
 
-function selectedRows(){
-  const period = periodSelect.value || 'all';
-  return data.rows.filter(r => period === 'all' || r.periodKey === period).sort((a,b)=>a.date.localeCompare(b.date));
+function downloadFile(name, text) {
+  const blob = new Blob([text], { type: "text/calendar;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
-function render(){
-  const shifts = selectedShifts();
-  const name = nameSelect.value;
-  shiftCount.textContent = String(shifts.length);
-  confirmCheck.checked = false;
-  renderShiftPreview(shifts);
-  renderRotaTable(name);
+function renderPeriodOptions() {
+  els.periodSelect.innerHTML = "";
+  rotaPeriods.forEach((p, idx) => {
+    const option = document.createElement("option");
+    option.value = String(idx);
+    option.textContent = p.label;
+    els.periodSelect.appendChild(option);
+  });
+  els.periodSelect.disabled = rotaPeriods.length === 0;
+  if (rotaPeriods.length) selectPeriod(0);
+}
+
+function selectPeriod(idx) {
+  selectedPeriod = rotaPeriods[idx];
+  selectedName = "";
+  els.nameSelect.innerHTML = '<option value="">Select your name…</option>';
+  selectedPeriod.names.forEach(name => {
+    const option = document.createElement("option");
+    option.value = name;
+    option.textContent = name;
+    els.nameSelect.appendChild(option);
+  });
+  els.nameSelect.disabled = false;
+  els.summaryCard.hidden = true;
+  els.rotaCard.hidden = true;
+  els.confirmCheck.checked = false;
   updateDownloadState();
 }
 
-function renderShiftPreview(shifts){
-  if(!nameSelect.value){ shiftPreview.innerHTML = '<p class="empty">Select your name to preview shifts.</p>'; return; }
-  if(!shifts.length){ shiftPreview.innerHTML = '<p class="empty">No duties found for this name in this range.</p>'; return; }
-  shiftPreview.innerHTML = shifts.map(s => `<div class="shift"><div><strong>${formatDate(s.date)}</strong><br><small>${esc(s.weekday)}</small></div><div>${esc(s.column)}</div><div><small>All day</small></div></div>`).join('');
-}
-
-function renderRotaTable(name){
-  const rows = selectedRows();
-  if(!rows.length){ rotaTable.innerHTML = '<p class="empty">No rota rows loaded.</p>'; return; }
-  const dutyColumns = [...new Set(rows.flatMap(r => r.duties.map(d => d.column)))];
-  let currentPeriod = '';
-  let html = '<table class="rotaTable"><thead><tr><th>Day</th><th>Date</th>'+dutyColumns.map(c=>`<th>${esc(c)}</th>`).join('')+'</tr></thead><tbody>';
-  for(const row of rows){
-    const period = (data.periods.find(p => p.key === row.periodKey) || {}).label || row.periodKey;
-    if(period !== currentPeriod){ currentPeriod = period; html += `<tr class="monthRow"><th colspan="${2+dutyColumns.length}">${esc(period)}</th></tr>`; }
-    html += `<tr><td>${esc(row.weekday)}</td><td>${formatDate(row.date)}</td>`;
-    for(const col of dutyColumns){
-      const duty = row.duties.find(d => d.column === col);
-      const value = duty ? duty.name : '';
-      const isHit = name && value === name;
-      html += `<td class="${isHit ? 'hit' : ''}">${esc(value)}</td>`;
-    }
-    html += '</tr>';
+function selectName(name) {
+  selectedName = name;
+  els.confirmCheck.checked = false;
+  if (!selectedPeriod || !selectedName) {
+    els.summaryCard.hidden = true;
+    els.rotaCard.hidden = true;
+    return;
   }
-  html += '</tbody></table>';
-  rotaTable.innerHTML = html;
+  renderSummary();
+  renderRotaTable();
+  els.summaryCard.hidden = false;
+  els.rotaCard.hidden = false;
+  updateDownloadState();
 }
 
-function updateDownloadState(){ downloadBtn.disabled = selectedShifts().length === 0 || !confirmCheck.checked; }
-function downloadIcs(){ const name=nameSelect.value; downloadFile(`${safe(name)}-rie-icu-rota.ics`, buildIcs(selectedShifts(), name), 'text/calendar;charset=utf-8'); }
-
-function buildIcs(shifts, name){
-  const stamp = toIcsUtc(new Date());
-  const events = shifts.map((s, i) => {
-    const start = s.date.replaceAll('-','');
-    const end = addOneDayIso(s.date).replaceAll('-','');
-    return ['BEGIN:VEVENT',
-      `UID:${safe(name)}-${s.date}-${safe(s.column)}-${i}@rie-icu-rota`,
-      `DTSTAMP:${stamp}`,
-      `DTSTART;VALUE=DATE:${start}`,
-      `DTEND;VALUE=DATE:${end}`,
-      `SUMMARY:${icsEsc('ICU '+s.column)}`,
-      'LOCATION:RIE ICU',
-      `DESCRIPTION:${icsEsc('Experimental rota calendar export. Check against official rota. Name: '+name+'; duty: '+s.column)}`,
-      'END:VEVENT'].join('\r\n');
-  }).join('\r\n');
-  return ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//RIE ICU Rota Calendar//EN',events,'END:VCALENDAR'].join('\r\n');
+function renderSummary() {
+  const events = eventsForName(selectedPeriod, selectedName);
+  els.summaryText.textContent = `${events.length} all-day event${events.length === 1 ? "" : "s"} for ${selectedName} in ${selectedPeriod.label}.`;
+  els.shiftList.innerHTML = `<thead><tr><th>Date</th><th>Day</th><th>Duty</th></tr></thead><tbody>${events.map(e => `<tr><td>${formatDate(e.date)}</td><td>${e.weekday}</td><td>${e.duty}</td></tr>`).join("")}</tbody>`;
 }
 
-async function parseDocxArrayBuffer(arrayBuffer,fileName,fileOrder){
-  const zip=await JSZip.loadAsync(arrayBuffer);
-  const docfile=zip.file('word/document.xml');
-  if(!docfile)throw new Error(`${fileName}: no word/document.xml found.`);
-  const xmlText=await docfile.async('text');
-  const xml=new DOMParser().parseFromString(xmlText,'application/xml');
-  const body=xml.getElementsByTagNameNS('*','body')[0];
-  let current=null;
-  const periods=[],rows=[],shifts=[],names=new Set();
-  for(const child of [...body.children]){
-    if(child.localName==='p'){
-      const h=parseHeading(textFromNode(child));
-      if(h)current=h;
+function renderRotaTable() {
+  const html = selectedPeriod.months.map(month => {
+    const rows = month.rows.map(row => {
+      const cells = row.duties.map(d => `<td>${d.name === selectedName ? `<span class="hit">${d.name}</span>` : d.name}</td>`).join("");
+      return `<tr><td>${row.weekday}</td><td>${row.day}</td>${cells}</tr>`;
+    }).join("");
+    return `<div class="rotaMonth"><h3>${month.title}</h3><table><thead><tr><th>Day</th><th>Date</th>${COLUMNS.map(c => `<th>${c}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>`;
+  }).join("");
+  els.rotaTableWrap.innerHTML = html;
+}
+
+function formatDate(iso) {
+  return new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" });
+}
+
+function updateDownloadState() {
+  const events = selectedPeriod && selectedName ? eventsForName(selectedPeriod, selectedName) : [];
+  els.downloadBtn.disabled = !(selectedPeriod && selectedName && events.length && els.confirmCheck.checked);
+}
+
+els.periodSelect.addEventListener("change", e => selectPeriod(Number(e.target.value)));
+els.nameSelect.addEventListener("change", e => selectName(e.target.value));
+els.confirmCheck.addEventListener("change", updateDownloadState);
+els.downloadBtn.addEventListener("click", () => {
+  const events = eventsForName(selectedPeriod, selectedName);
+  const ics = generateICS(events, selectedPeriod.label);
+  const safe = `${selectedName}-${selectedPeriod.label}`.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  downloadFile(`${safe}.ics`, ics);
+});
+
+async function init() {
+  try {
+    const files = await listDocxFiles();
+    if (!files.length) throw new Error("No .docx files found in rotas/.");
+    const parsed = [];
+    for (const file of files) {
+      const text = await extractDocxText(file.url);
+      const period = parseRotaText(text, file.name);
+      if (period.months.length) parsed.push(period);
     }
-    if(child.localName==='tbl'&&current){
-      const result=parseTable(child,current,fileName,fileOrder);
-      if(result.rows.length){
-        periods.push(result.period); rows.push(...result.rows); shifts.push(...result.shifts); result.shifts.forEach(s=>names.add(s.name));
-      }
-    }
+    if (!parsed.length) throw new Error("No readable rota tables found in the Word files.");
+    rotaPeriods = parsed.sort((a, b) => {
+      const aa = a.months[0]?.year * 12 + a.months[0]?.monthIndex;
+      const bb = b.months[0]?.year * 12 + b.months[0]?.monthIndex;
+      return aa - bb;
+    });
+    renderPeriodOptions();
+  } catch (err) {
+    els.periodSelect.innerHTML = `<option>${err.message}</option>`;
+    document.querySelector(".notice").classList.add("error");
   }
-  return{generatedFrom:fileName,fileOrder,periods,rows,shifts,names:[...names].sort()};
 }
 
-function combineRotaData(dataSets){
-  const monthMap=new Map();
-  const sources=[];
-  for(const data of dataSets){
-    sources.push(data.generatedFrom);
-    for(const period of data.periods){
-      const current = monthMap.get(period.key);
-      if(!current || data.fileOrder >= current.fileOrder){
-        monthMap.set(period.key,{period,rows:data.rows.filter(r=>r.periodKey===period.key),shifts:data.shifts.filter(s=>s.periodKey===period.key),source:data.generatedFrom,fileOrder:data.fileOrder});
-      }
-    }
-  }
-  const months=[...monthMap.values()].sort((a,b)=>a.period.key.localeCompare(b.period.key));
-  const periods=months.map(m=>m.period);
-  const rows=months.flatMap(m=>m.rows);
-  const shifts=months.flatMap(m=>m.shifts);
-  const names=[...new Set(shifts.map(s=>s.name).filter(Boolean))].sort();
-  const allLabel=periods.length?`${periods[0].label.split(' ')[0]} - ${periods[periods.length-1].label}`:'All rotas';
-  return{generatedFrom:sources,periods:[{key:'all',label:allLabel,start:periods[0]?.start||''},...periods],rows,shifts,names};
-}
-
-function parseHeading(text){
-  const compact=String(text||'').toLowerCase().replace(/\s+/g,'');
-  const m=compact.match(/criticalcareconsultantrota([a-z]+)(\d{4})/);
-  if(!m)return null;
-  const monthIndex=MONTHS[m[1]],year=Number(m[2]);
-  if(monthIndex===undefined||!year)return null;
-  return{monthIndex,year};
-}
-
-function parseTable(tbl,h,fileName,fileOrder){
-  const raw=[...tbl.getElementsByTagNameNS('*','tr')].map(r=>[...r.getElementsByTagNameNS('*','tc')].map(c=>clean(textFromNode(c))));
-  if(!raw.length)return{rows:[],shifts:[],period:null};
-  const headerIndex=raw.findIndex(r=>r.filter(isDutyHeader).length>=2);
-  if(headerIndex<0)return{rows:[],shifts:[],period:null};
-  const header=raw[headerIndex];
-  const dateIndex=findDateColumnIndex(header,raw,headerIndex);
-  const dutyCols=header.map((label,index)=>({label:normaliseDuty(label),index})).filter(c=>c.index>dateIndex&&c.label);
-  const periodKey=`${h.year}-${String(h.monthIndex+1).padStart(2,'0')}`;
-  const periodLabel=`${MONTH_NAMES[h.monthIndex]} ${h.year}`;
-  const rows=[],shifts=[];
-  for(const r of raw.slice(headerIndex+1)){
-    const weekday=r[dateIndex-1]||'';
-    const day=Number(r[dateIndex]);
-    if(!Number.isInteger(day)||day<1||day>31)continue;
-    const iso=`${h.year}-${String(h.monthIndex+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-    const row={periodKey,date:iso,weekday,duties:[],source:fileName,fileOrder};
-    for(const col of dutyCols){
-      const name=cleanName(r[col.index]);
-      row.duties.push({column:col.label,name});
-      if(name)shifts.push({periodKey,date:iso,weekday,column:col.label,name,source:fileName,fileOrder});
-    }
-    rows.push(row);
-  }
-  return{period:{key:periodKey,label:periodLabel,start:`${periodKey}-01`,source:fileName,fileOrder},rows,shifts};
-}
-
-function findDateColumnIndex(header,rows,headerIndex){
-  for(let i=0;i<header.length;i++){
-    const sample=rows.slice(headerIndex+1,headerIndex+8).map(r=>r[i]);
-    const numeric=sample.filter(v=>/^\d{1,2}$/.test(String(v||'').trim())).length;
-    const prev=i>0&&rows.slice(headerIndex+1,headerIndex+8).filter(r=>/^(mon|monday|tue|tues|tuesday|wed|wednesday|thu|thur|thurs|thursday|fri|friday|sat|saturday|sun|sunday)$/i.test(String(r[i-1]||'').trim())).length>=2;
-    if(numeric>=2&&prev)return i;
-  }
-  return 1;
-}
-
-function isDutyHeader(v){return/\b(base|on\s*call|night|116|118)\b/i.test(clean(v));}
-function normaliseDuty(v){const t=clean(v).replace(/\b1\s*st\b/i,'1st').replace(/\b2\s*nd\b/i,'2nd');return isDutyHeader(t)?t:'';}
-function cleanName(v){const n=clean(v).toUpperCase();return(!n||n==='SERVICE')?'':n;}
-function textFromNode(node){return[...node.getElementsByTagNameNS('*','t')].map(t=>t.textContent).join(' ').replace(/\s+/g,' ').trim();}
-function clean(s){return String(s||'').replace(/\u00a0/g,' ').replace(/\s+/g,' ').trim();}
-function addOneDayIso(iso){ const d=new Date(iso+'T00:00:00'); d.setDate(d.getDate()+1); return d.toISOString().slice(0,10); }
-function toIcsUtc(d){ return `${d.getUTCFullYear()}${pad(d.getUTCMonth()+1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`; }
-function formatDate(iso){ return new Date(iso+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}); }
-function pad(n){ return String(n).padStart(2,'0'); }
-function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function icsEsc(s){ return String(s).replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\n/g,'\\n'); }
-function safe(s){ return String(s || 'rota').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); }
-function downloadFile(filename, content, type){ const blob=new Blob([content],{type}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); }
+init();

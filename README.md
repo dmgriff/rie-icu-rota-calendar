@@ -1,50 +1,73 @@
 # RIE ICU rota calendar
 
-A static GitHub Pages site that reads Word rota files from the `rotas/` folder and lets users download their duties as all-day `.ics` calendar events.
+Static GitHub Pages site that reads Word `.docx` rota files directly from the repository and generates all-day `.ics` calendar imports for a selected clinician.
 
-## Public URLs
+## Normal rota workflow
+
+1. Create the rota as a Word `.docx` file.
+2. Upload the `.docx` file to the repository folder: `rotas/`.
+3. The website automatically detects all `.docx` files in `rotas/`.
+4. Users select the rota period, then their name, check the highlighted rota, and download an `.ics` file.
+
+There is no admin page.
+
+## Website URLs
 
 User page:
 
-`https://dmgriff.github.io/rie-icu-rota-calendar/`
+```text
+https://dmgriff.github.io/rie-icu-rota-calendar/
+```
 
-Rota upload instructions:
+GitHub repository:
 
-`https://dmgriff.github.io/rie-icu-rota-calendar/admin.html`
+```text
+https://github.com/dmgriff/rie-icu-rota-calendar
+```
 
-## Minimal rota-master workflow
+## How to upload a new rota file
 
-1. Create the official ICU rota as a Word `.docx` file.
-2. Open the GitHub repository.
-3. Open the `rotas/` folder.
-4. Upload the new Word rota file.
-5. Commit changes.
-6. The public page automatically reads all `.docx` files in `rotas/` and updates the rota-period dropdown.
+1. Open the repository:
+   `https://github.com/dmgriff/rie-icu-rota-calendar`
+2. Open the folder `rotas`.
+3. Click **Add file → Upload files**.
+4. Upload the new `.docx` rota file.
+5. Scroll down and click **Commit changes**.
+6. Wait about 1 minute.
+7. Refresh the website.
 
-No `rota-data.js` rebuild is needed.
+The new rota period should appear in the dropdown.
 
-## Keeping old rotas available
+## How to keep previous rotas
 
-Do not delete older Word files from `rotas/` if you want those periods to remain available.
+Do not delete old `.docx` files from `rotas/`.
 
-Example folder contents:
+For example:
 
-- `RIE ICU APR JUL 26.docx`
-- `RIE ICU AUG NOV 26 V1.docx`
-- `RIE ICU DEC MAR 27.docx`
+```text
+rotas/RIE-ICU-Apr-Jul-2026.docx
+rotas/RIE-ICU-Aug-Nov-2026.docx
+rotas/RIE-ICU-Dec-Mar-2027.docx
+```
 
-The dropdown will then include the months found in those documents, plus an all-period option.
+Each file appears as a separate rota period.
 
-## Overlapping months
+## Important limitations
 
-If two Word files contain the same month, the app uses the later file alphabetically/upload-order fallback as implemented in the browser parser. Best practice: keep only the current official version for any month.
-
-## Access control
-
-GitHub Pages is static. The secure control is GitHub repository permissions: only nominated rota uploaders should have write access to the repository.
+- The tool is experimental.
+- Users must check the preview against the official rota before importing.
+- The Word rota needs to keep the same broad structure:
+  - month headings such as `Critical Care Consultant rota August 2026`
+  - weekday row
+  - date number
+  - duty columns in order:
+    - 118 base A
+    - 118 Base B
+    - 116 base C
+    - 116 base D
+    - 1st on call night
+    - 2nd on call night
 
 ## Calendar behaviour
 
-The `.ics` export uses all-day events, one event per duty. If a person has both a base duty and an on-call duty on the same day, both are exported.
-
-The ICS file is deliberately minimal to encourage import into an existing calendar, but the final behaviour is controlled by Apple Calendar, Google Calendar, Outlook, or the user's device.
+The generated `.ics` file contains separate all-day events for every duty. If someone has more than one duty on the same day, both are included.

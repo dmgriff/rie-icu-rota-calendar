@@ -8,64 +8,67 @@
 </head>
 <body>
   <main class="page">
-    <header class="topbar">
-      <div>
-        <p class="eyebrow">RIE ICU</p>
-        <h1>Rota calendar export</h1>
-      </div>
-      <a class="adminLink" href="admin.html">Rota upload instructions</a>
-    </header>
-
-    <section class="panel" id="loadingPanel">
-      <h2>Loading rotas</h2>
-      <p id="loadStatus">Looking for Word rota files in the GitHub <code>rotas/</code> folder...</p>
-      <div class="loaderBar"><span></span></div>
+    <section class="hero">
+      <p class="eyebrow">RIE ICU</p>
+      <h1>Rota calendar download</h1>
+      <p class="lede">Select a rota period, choose your name, check the highlighted duties, then download an all-day calendar import file.</p>
     </section>
 
-    <section class="panel hidden" id="mainPanel">
-      <div class="grid two">
-        <label>
-          <span>Rota period</span>
-          <select id="periodSelect"></select>
-        </label>
-        <label>
-          <span>Name</span>
-          <select id="nameSelect"></select>
-        </label>
-      </div>
+    <section class="notice">
+      <strong>Experimental tool.</strong> Please double-check the preview against the official rota before importing. If anything looks wrong, do not use the download and contact the rota organiser.
+    </section>
 
-      <div class="summaryLine">
-        <strong id="shiftCount">0</strong> all-day duties selected
-      </div>
+    <section class="card controls">
+      <label>
+        <span>Rota period</span>
+        <select id="periodSelect" disabled>
+          <option>Loading rota files…</option>
+        </select>
+      </label>
 
-      <div class="previewGrid">
-        <section>
-          <h2>Events to be added</h2>
-          <div id="shiftPreview" class="shiftPreview"></div>
-        </section>
-        <section>
-          <h2>Source rota check</h2>
-          <p class="muted">Your selected name is highlighted. Check this carefully before downloading.</p>
-          <div id="rotaTable" class="tableWrap"></div>
-        </section>
-      </div>
+      <label>
+        <span>Name</span>
+        <select id="nameSelect" disabled>
+          <option>Select rota period first</option>
+        </select>
+      </label>
+    </section>
 
-      <section class="disclaimer">
-        <label class="checkrow">
-          <input id="confirmCheck" type="checkbox" />
-          <span>I have checked the preview against the highlighted rota and understand this tool is experimental.</span>
-        </label>
+    <section class="card" id="summaryCard" hidden>
+      <div class="summaryHeader">
+        <div>
+          <h2>Preview</h2>
+          <p id="summaryText"></p>
+        </div>
         <button id="downloadBtn" disabled>Download calendar file</button>
-      </section>
+      </div>
+
+      <label class="confirm">
+        <input type="checkbox" id="confirmCheck" />
+        <span>I have checked the preview against the official rota and accept this is experimental.</span>
+      </label>
+
+      <div class="shiftListWrap">
+        <table class="shiftList" id="shiftList"></table>
+      </div>
     </section>
 
-    <section class="panel hidden" id="errorPanel">
-      <h2>Could not load rota files</h2>
-      <p id="errorText"></p>
-      <p class="muted">The site needs to be published on GitHub Pages, with Word rota files stored in a <code>rotas/</code> folder.</p>
+    <section class="card" id="rotaCard" hidden>
+      <div class="tableHeader">
+        <div>
+          <h2>Source rota</h2>
+          <p>The selected name is highlighted wherever it appears, including multiple duties on the same day.</p>
+        </div>
+      </div>
+      <div class="rotaTableWrap" id="rotaTableWrap"></div>
+    </section>
+
+    <section class="smallprint">
+      To add a new rota period, upload a Word <code>.docx</code> rota file to the repository folder <code>rotas/</code>. The site detects the files automatically.
     </section>
   </main>
-  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

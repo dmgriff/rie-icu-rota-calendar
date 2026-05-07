@@ -8,63 +8,64 @@
 </head>
 <body>
   <main class="page">
-    <header class="hero">
-      <p class="eyebrow">RIE ICU</p>
-      <h1>Rota calendar download</h1>
-      <p>Select a rota range and your name. Check the highlighted rota and shift list, then download an event-import file for your existing calendar.</p>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">RIE ICU</p>
+        <h1>Rota calendar export</h1>
+      </div>
+      <a class="adminLink" href="admin.html">Rota upload instructions</a>
     </header>
 
-    <section class="panel warning">
-      <strong>Experimental tool.</strong>
-      <span>Please check the highlighted rota and downloaded calendar against the official rota. The official rota remains the source of truth.</span>
+    <section class="panel" id="loadingPanel">
+      <h2>Loading rotas</h2>
+      <p id="loadStatus">Looking for Word rota files in the GitHub <code>rotas/</code> folder...</p>
+      <div class="loaderBar"><span></span></div>
     </section>
 
-    <section class="panel grid">
-      <label>
-        <span>Rota range</span>
-        <select id="periodSelect"></select>
-      </label>
-      <label>
-        <span>Name</span>
-        <select id="nameSelect"></select>
-      </label>
-    </section>
-
-    <section class="panel">
-      <div class="sectionHead">
-        <div>
-          <h2>Shifts to be added</h2>
-          <p><strong id="shiftCount">0</strong> all-day calendar events selected.</p>
-        </div>
+    <section class="panel hidden" id="mainPanel">
+      <div class="grid two">
+        <label>
+          <span>Rota period</span>
+          <select id="periodSelect"></select>
+        </label>
+        <label>
+          <span>Name</span>
+          <select id="nameSelect"></select>
+        </label>
       </div>
-      <div id="shiftPreview" class="shiftPreview"></div>
-    </section>
 
-    <section class="panel">
-      <div class="sectionHead">
-        <div>
-          <h2>Rota check</h2>
-          <p>Your selected name is highlighted below. Multiple same-day duties are kept as separate events.</p>
-        </div>
+      <div class="summaryLine">
+        <strong id="shiftCount">0</strong> all-day duties selected
       </div>
-      <div id="rotaTable" class="rotaTableWrap"></div>
+
+      <div class="previewGrid">
+        <section>
+          <h2>Events to be added</h2>
+          <div id="shiftPreview" class="shiftPreview"></div>
+        </section>
+        <section>
+          <h2>Source rota check</h2>
+          <p class="muted">Your selected name is highlighted. Check this carefully before downloading.</p>
+          <div id="rotaTable" class="tableWrap"></div>
+        </section>
+      </div>
+
+      <section class="disclaimer">
+        <label class="checkrow">
+          <input id="confirmCheck" type="checkbox" />
+          <span>I have checked the preview against the highlighted rota and understand this tool is experimental.</span>
+        </label>
+        <button id="downloadBtn" disabled>Download calendar file</button>
+      </section>
     </section>
 
-    <section class="panel confirm">
-      <label class="checkline">
-        <input id="confirmCheck" type="checkbox" />
-        <span>I have checked the highlighted duties against the rota.</span>
-      </label>
-      <button id="downloadBtn" disabled>Confirm and add to calendar</button>
+    <section class="panel hidden" id="errorPanel">
+      <h2>Could not load rota files</h2>
+      <p id="errorText"></p>
+      <p class="muted">The site needs to be published on GitHub Pages, with Word rota files stored in a <code>rotas/</code> folder.</p>
     </section>
-
-    <footer>
-      Rota data is read from this website. Event-import files are generated locally in your browser.
-      <a href="admin.html">Rota writer upload page</a>
-    </footer>
   </main>
-
-  <script src="rota-data.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

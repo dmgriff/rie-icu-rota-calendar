@@ -102,7 +102,11 @@ function buildIcs(shifts, name){
       `DESCRIPTION:${icsEsc('Experimental rota calendar export. Check against official rota. Name: '+name+'; duty: '+s.column)}`,
       'END:VEVENT'].join('\r\n');
   }).join('\r\n');
-  return ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//RIE ICU Rota Calendar//EN','CALSCALE:GREGORIAN','METHOD:PUBLISH',events,'END:VCALENDAR'].join('\r\n');
+
+  // Ultra-minimal event-import ICS.
+  // No X-WR-CALNAME, no METHOD, no CALSCALE, no VTIMEZONE.
+  // The VCALENDAR wrapper is still required for a valid .ics file.
+  return ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//RIE ICU Rota Calendar//EN',events,'END:VCALENDAR'].join('\r\n');
 }
 
 function addOneDayIso(iso){ const d=new Date(iso+'T00:00:00'); d.setDate(d.getDate()+1); return d.toISOString().slice(0,10); }

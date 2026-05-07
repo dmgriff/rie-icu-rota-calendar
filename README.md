@@ -1,6 +1,6 @@
 # RIE ICU rota calendar website
 
-This is a static GitHub Pages website for generating personal `.ics` calendar files from the RIE ICU consultant rota.
+This is a static GitHub Pages website for generating personal `.ics` event-import files from the RIE ICU consultant rota.
 
 ## What the public page does
 
@@ -11,10 +11,12 @@ The public page has:
 3. A list of all shifts that will go into the `.ics` download.
 4. A copy of the rota table with the selected name highlighted.
 5. A confirmation checkbox.
-6. A final **Confirm and download .ics** button.
+6. A final **Confirm and add to calendar** button.
 7. A disclaimer telling users to check against the official rota.
 
 Every selected duty is exported as a separate all-day event. If someone is listed in two columns on the same day, both duties are included.
+
+The `.ics` file is deliberately generated without a calendar name such as `X-WR-CALNAME` and without `METHOD:PUBLISH`. This encourages Apple Calendar, Outlook, and similar apps to treat the file as an event import so the user can add the duties to an existing calendar rather than creating a separate named rota calendar. The calendar app still controls the exact import workflow.
 
 ## How nominated rota upload works
 
@@ -70,3 +72,10 @@ The live website will update automatically, usually within a minute.
 ## Important limitation
 
 This does not replace the official rota. The parser is designed for the current RIE ICU rota table structure. Users must check the highlighted rota and their downloaded calendar against the official rota.
+
+
+## Calendar import behaviour
+
+This version generates an ultra-minimal `.ics` file intended to behave like an event import rather than a named calendar import. It deliberately avoids calendar-name metadata, publishing metadata, timezone blocks and other fields that can encourage Apple Calendar to create a separate calendar.
+
+Important: the final import behaviour is controlled by the user's calendar app. If prompted, users should choose their existing calendar as the destination.

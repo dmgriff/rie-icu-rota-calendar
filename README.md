@@ -1,73 +1,72 @@
-# RIE ICU rota calendar
+# RIE ICU rota calendar website
 
-Static GitHub Pages site that reads Word `.docx` rota files directly from the repository and generates all-day `.ics` calendar imports for a selected clinician.
+This is a static GitHub Pages website for generating personal `.ics` calendar files from the RIE ICU consultant rota.
 
-## Normal rota workflow
+## What the public page does
 
-1. Create the rota as a Word `.docx` file.
-2. Upload the `.docx` file to the repository folder: `rotas/`.
-3. The website automatically detects all `.docx` files in `rotas/`.
-4. Users select the rota period, then their name, check the highlighted rota, and download an `.ics` file.
+The public page has:
 
-There is no admin page.
+1. A rota range selector, for example **August - November 2026**.
+2. A name selector populated from the rota.
+3. A list of all shifts that will go into the `.ics` download.
+4. A copy of the rota table with the selected name highlighted.
+5. A confirmation checkbox.
+6. A final **Confirm and download .ics** button.
+7. A disclaimer telling users to check against the official rota.
 
-## Website URLs
+Every selected duty is exported as a separate all-day event. If someone is listed in two columns on the same day, both duties are included.
 
-User page:
+## How nominated rota upload works
+
+GitHub Pages is a static website. It cannot securely store uploaded files or authenticate uploaders by itself.
+
+The secure control is therefore **GitHub repository write access**:
+
+- only you and/or the rota writer should have permission to edit the repository;
+- ordinary users can use the public page but cannot publish a new rota;
+- the rota writer updates the published rota by replacing `rota-data.js`.
+
+## Initial setup on GitHub Pages
+
+1. Create a GitHub account, if needed.
+2. Create a new public repository, for example `rie-icu-rota-calendar`.
+3. Upload these files:
+   - `index.html`
+   - `style.css`
+   - `app.js`
+   - `rota-data.js`
+   - `admin.html`
+   - `admin.js`
+   - `README.md`
+4. In the repository, go to **Settings → Pages**.
+5. Under **Build and deployment**, choose:
+   - **Source**: Deploy from a branch
+   - **Branch**: main
+   - **Folder**: /root
+6. Save.
+7. GitHub will give you a link like:
 
 ```text
-https://dmgriff.github.io/rie-icu-rota-calendar/
+https://YOUR-GITHUB-NAME.github.io/rie-icu-rota-calendar/
 ```
 
-GitHub repository:
+Share that link with consultants.
 
-```text
-https://github.com/dmgriff/rie-icu-rota-calendar
-```
+## Updating the rota later
 
-## How to upload a new rota file
+For the rota writer:
 
-1. Open the repository:
-   `https://github.com/dmgriff/rie-icu-rota-calendar`
-2. Open the folder `rotas`.
-3. Click **Add file → Upload files**.
-4. Upload the new `.docx` rota file.
-5. Scroll down and click **Commit changes**.
-6. Wait about 1 minute.
-7. Refresh the website.
+1. Open the site and click **Rota writer upload page** at the bottom.
+2. Upload the official `.docx` rota.
+3. Click **Download rota-data.js**.
+4. Go to the GitHub repository.
+5. Open `rota-data.js`.
+6. Click the pencil/edit icon.
+7. Replace the whole file contents with the new downloaded file contents.
+8. Click **Commit changes**.
 
-The new rota period should appear in the dropdown.
+The live website will update automatically, usually within a minute.
 
-## How to keep previous rotas
+## Important limitation
 
-Do not delete old `.docx` files from `rotas/`.
-
-For example:
-
-```text
-rotas/RIE-ICU-Apr-Jul-2026.docx
-rotas/RIE-ICU-Aug-Nov-2026.docx
-rotas/RIE-ICU-Dec-Mar-2027.docx
-```
-
-Each file appears as a separate rota period.
-
-## Important limitations
-
-- The tool is experimental.
-- Users must check the preview against the official rota before importing.
-- The Word rota needs to keep the same broad structure:
-  - month headings such as `Critical Care Consultant rota August 2026`
-  - weekday row
-  - date number
-  - duty columns in order:
-    - 118 base A
-    - 118 Base B
-    - 116 base C
-    - 116 base D
-    - 1st on call night
-    - 2nd on call night
-
-## Calendar behaviour
-
-The generated `.ics` file contains separate all-day events for every duty. If someone has more than one duty on the same day, both are included.
+This does not replace the official rota. The parser is designed for the current RIE ICU rota table structure. Users must check the highlighted rota and their downloaded calendar against the official rota.

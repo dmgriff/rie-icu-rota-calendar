@@ -8,67 +8,63 @@
 </head>
 <body>
   <main class="page">
-    <section class="hero">
+    <header class="hero">
       <p class="eyebrow">RIE ICU</p>
       <h1>Rota calendar download</h1>
-      <p class="lede">Select a rota period, choose your name, check the highlighted duties, then download an all-day calendar import file.</p>
+      <p>Select a rota range and your name. Check the highlighted rota and shift list, then download your calendar file.</p>
+    </header>
+
+    <section class="panel warning">
+      <strong>Experimental tool.</strong>
+      <span>Please check the highlighted rota and downloaded calendar against the official rota. The official rota remains the source of truth.</span>
     </section>
 
-    <section class="notice">
-      <strong>Experimental tool.</strong> Please double-check the preview against the official rota before importing. If anything looks wrong, do not use the download and contact the rota organiser.
-    </section>
-
-    <section class="card controls">
+    <section class="panel grid">
       <label>
-        <span>Rota period</span>
-        <select id="periodSelect" disabled>
-          <option>Loading rota files…</option>
-        </select>
+        <span>Rota range</span>
+        <select id="periodSelect"></select>
       </label>
-
       <label>
         <span>Name</span>
-        <select id="nameSelect" disabled>
-          <option>Select rota period first</option>
-        </select>
+        <select id="nameSelect"></select>
       </label>
     </section>
 
-    <section class="card" id="summaryCard" hidden>
-      <div class="summaryHeader">
+    <section class="panel">
+      <div class="sectionHead">
         <div>
-          <h2>Preview</h2>
-          <p id="summaryText"></p>
+          <h2>Shifts to be added</h2>
+          <p><strong id="shiftCount">0</strong> all-day calendar events selected.</p>
         </div>
-        <button id="downloadBtn" disabled>Download calendar file</button>
       </div>
+      <div id="shiftPreview" class="shiftPreview"></div>
+    </section>
 
-      <label class="confirm">
-        <input type="checkbox" id="confirmCheck" />
-        <span>I have checked the preview against the official rota and accept this is experimental.</span>
+    <section class="panel">
+      <div class="sectionHead">
+        <div>
+          <h2>Rota check</h2>
+          <p>Your selected name is highlighted below. Multiple same-day duties are kept as separate events.</p>
+        </div>
+      </div>
+      <div id="rotaTable" class="rotaTableWrap"></div>
+    </section>
+
+    <section class="panel confirm">
+      <label class="checkline">
+        <input id="confirmCheck" type="checkbox" />
+        <span>I have checked the highlighted duties against the rota.</span>
       </label>
-
-      <div class="shiftListWrap">
-        <table class="shiftList" id="shiftList"></table>
-      </div>
+      <button id="downloadBtn" disabled>Confirm and download .ics</button>
     </section>
 
-    <section class="card" id="rotaCard" hidden>
-      <div class="tableHeader">
-        <div>
-          <h2>Source rota</h2>
-          <p>The selected name is highlighted wherever it appears, including multiple duties on the same day.</p>
-        </div>
-      </div>
-      <div class="rotaTableWrap" id="rotaTableWrap"></div>
-    </section>
-
-    <section class="smallprint">
-      To add a new rota period, upload a Word <code>.docx</code> rota file to the repository folder <code>rotas/</code>. The site detects the files automatically.
-    </section>
+    <footer>
+      Rota data is read from this website. Calendar files are generated locally in your browser.
+      <a href="admin.html">Rota writer upload page</a>
+    </footer>
   </main>
 
-  <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
+  <script src="rota-data.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

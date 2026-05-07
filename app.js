@@ -89,6 +89,12 @@ function downloadIcs(){
 
 function buildIcs(shifts, name){
   const stamp = toIcsUtc(new Date());
+
+  // Ultra-minimal event import.
+  // Deliberately avoids X-WR-CALNAME, METHOD:PUBLISH, VTIMEZONE, LOCATION and DESCRIPTION
+  // because Apple Calendar can interpret richer ICS files as a separate calendar.
+  // Calendar apps still control the final import behaviour, but this is the most
+  // compatible static-file approach for adding events to an existing calendar.
   const events = shifts.map((s, i) => {
     const start = s.date.replaceAll('-','');
     const end = addOneDayIso(s.date).replaceAll('-','');
@@ -98,11 +104,10 @@ function buildIcs(shifts, name){
       `DTSTART;VALUE=DATE:${start}`,
       `DTEND;VALUE=DATE:${end}`,
       `SUMMARY:${icsEsc('ICU '+s.column)}`,
-      'LOCATION:RIE ICU',
-      `DESCRIPTION:${icsEsc('Experimental rota calendar export. Check against official rota. Name: '+name+'; duty: '+s.column)}`,
       'END:VEVENT'].join('\r\n');
   }).join('\r\n');
-  return ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//RIE ICU Rota Calendar//EN','CALSCALE:GREGORIAN','METHOD:PUBLISH',events,'END:VCALENDAR'].join('\r\n');
+
+  return ['BEGIN:VCALENDAR','VERSION:2.0',events,'END:VCALENDAR'].join('\r\n');
 }
 
 function addOneDayIso(iso){ const d=new Date(iso+'T00:00:00'); d.setDate(d.getDate()+1); return d.toISOString().slice(0,10); }
